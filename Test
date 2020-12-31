@@ -1,1 +1,106 @@
-print(Hello)
+-- Punch Settings
+local FastPunch = true
+local PunchDamage = 5 						-- (Multiplied by the normal damage)
+
+--LPS
+local AllowLoopPunchSpam = true			-- Hold for 'F' for Loop Punch Spam
+local HoldKeyDelay = 0.8					 -- (Seconds)
+
+
+local Mouse = game.Players.LocalPlayer:GetMouse()
+local MeleeRemote = game:GetService("ReplicatedStorage"):FindFirstChild("meleeEvent", true)
+local SoundEvent = game:GetService("ReplicatedStorage"):FindFirstChild("SoundEvent", true)
+local PunchSide = "Left"
+
+local function Punch()
+	local Command = "Fast Punch"
+	if FastPunch == true then		
+		-- Left Punch
+		local LeftAnim = Instance.new("Animation")
+		LeftAnim.AnimationId = "rbxassetid://484926359"
+		local LeftAnimation = game.Players.LocalPlayer.Character.Humanoid:LoadAnimation(LeftAnim)
+		-- Right Punch
+		local RightAnim = Instance.new("Animation")
+		RightAnim.AnimationId = "rbxassetid://484200742"
+		local RightAnimation = game.Players.LocalPlayer.Character.Humanoid:LoadAnimation(RightAnim)	
+
+		-- Punch Play
+		if PunchSide == "Left" then
+			LeftAnimation:Play()
+			LeftAnimation:AdjustSpeed(2)	
+			PunchSide = "Right"
+		else if PunchSide == "Right" then
+				RightAnimation:Play()
+				RightAnimation:AdjustSpeed(2)	
+				PunchSide = "Left"
+			end
+		end
+
+		-- Player Punch Detector
+		local DetectorPart = Instance.new("Part", game.Players.LocalPlayer.Character) 
+		DetectorPart.Transparency = 1 
+		DetectorPart.Size = Vector3.new(4, 2, 3) 
+		DetectorPart.CanCollide = false
+		local DetectorWeld = Instance.new("Weld", DetectorPart)
+		DetectorWeld.Part0 = game.Players.LocalPlayer.Character.Torso
+		DetectorWeld.Part1 = DetectorPart 
+		DetectorWeld.C1 = CFrame.new(0,0,2)
+
+		DetectorPart.Touched:Connect(function(Hit)
+			local Target = game.Players:FindFirstChild(Hit.Parent.Name)
+			if Target then
+				if Target.Name ~= game.Players.LocalPlayer.Name then
+					DetectorPart:Destroy()
+					-- Local Sound
+					game.Workspace[Target.Name].Head.punchSound:Play()
+					-- Server Sound
+					game:GetService("ReplicatedStorage").SoundEvent:FireServer(workspace[Target.Name].Head.punchSound)
+					-- Melee Event
+					for Index = 1, PunchDamage, 1 do
+						MeleeRemote:FireServer(Target)
+					end
+				end
+			end	
+		end)
+
+		wait(0.025)
+		DetectorPart:Destroy()
+	end
+end
+
+local Hold = false
+local LPS = false
+local Tick = tick()
+
+Mouse.KeyDown:Connect(function(Key)
+	Hold = true
+	if Key:lower() == "f" then
+		Punch()
+		Tick = tick()
+		repeat 
+			wait()
+		until tick() - Tick > HoldKeyDelay or Hold == false
+		if Hold == true then
+			LPS = true
+		end
+	end
+end)
+
+Mouse.KeyUp:Connect(function(Key)
+	if Key:lower() == "f" then
+		Hold = false
+		LPS = false
+	end
+end)
+
+spawn(function()
+	game:GetService("RunService").RenderStepped:Connect(function()
+		if FastPunch == true then
+			if LPS ==  true then
+				pcall(function()
+					Punch()  
+				end)
+			end
+		end
+	end)
+end)
